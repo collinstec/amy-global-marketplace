@@ -365,7 +365,7 @@
         <div class="panel">
           <div class="panel-head">
             <div><h2 class="panel-title">Project momentum</h2><div class="panel-sub">Progress across open projects</div></div>
-            <a class="link-btn" href="#/projects">All projects ${icon('arrow')}</a>
+            <a class="link-btn" href="#projects">All projects ${icon('arrow')}</a>
           </div>
           <div class="panel-body momentum">
             ${momentum.length ? momentum.map((p) => {
@@ -397,7 +397,7 @@
         <div>
           <div class="page-head" style="margin:8px 0 14px">
             <div><h2 class="panel-title" style="font-size:15px">Goals in focus</h2><div class="panel-sub">Nearest target dates</div></div>
-            <a class="link-btn" href="#/goals">All goals ${icon('arrow')}</a>
+            <a class="link-btn" href="#goals">All goals ${icon('arrow')}</a>
           </div>
           ${focus.length ? `<div class="focus-goals">${focus.map(goalCard).join('')}</div>`
             : emptyState('target', 'No goals yet', 'Goals give your projects direction. Set your first one.', `<button class="btn btn-primary" data-action="new-goal">${icon('plus')}New goal</button>`)}
@@ -709,13 +709,30 @@
       </form>`;
   }
 
+  function exportView() {
+    return `
+      <div class="modal">
+        <div class="modal-head">
+          <div><h2>Export backup</h2><p>Copy this text and keep it somewhere safe. Import it later to restore your projects and goals.</p></div>
+          <button type="button" class="icon-btn" data-action="close-modal" aria-label="Close">${icon('x')}</button>
+        </div>
+        <div class="modal-body">
+          <textarea id="export-json" class="textarea" readonly spellcheck="false" style="min-height:260px;font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace">${esc(JSON.stringify(state, null, 2))}</textarea>
+        </div>
+        <div class="modal-foot">
+          <button type="button" class="btn btn-secondary left" data-action="download-json">${icon('download')}Download file</button>
+          <button type="button" class="btn btn-primary" data-action="copy-json">Copy to clipboard</button>
+        </div>
+      </div>`;
+  }
+
   function renderModal() {
     const root = $('#modal-root');
     const m = ui.modal;
     if (!m) { root.innerHTML = ''; return; }
     if (root.dataset.key === `${m.type}:${m.id || ''}` && root.firstChild) return; // keep in-progress form input
     root.dataset.key = `${m.type}:${m.id || ''}`;
-    const body = m.type === 'project' ? projectForm(m.id && getProject(m.id)) : goalForm(m.id && getGoal(m.id));
+    const body = m.type === 'export' ? exportView() : m.type === 'project' ? projectForm(m.id && getProject(m.id)) : goalForm(m.id && getGoal(m.id));
     root.innerHTML = `<div class="modal-wrap" role="dialog" aria-modal="true"><div class="overlay" data-action="close-modal"></div>${body}</div>`;
     $('[autofocus]', root)?.focus();
   }
@@ -773,7 +790,7 @@
       ['goals', 'Goals', 'target', state.goals.length],
     ];
     $('#nav').innerHTML = nav.map(([id, label, ic, n]) =>
-      `<a href="#/${id}" class="${ui.view === id ? 'active' : ''}">${icon(ic)}${label}${n !== '' ? `<span class="count">${n}</span>` : ''}</a>`).join('');
+      `<a href="#${id}" class="${ui.view === id ? 'active' : ''}">${icon(ic)}${label}${n !== '' ? `<span class="count">${n}</span>` : ''}</a>`).join('');
 
     const active = state.projects.filter((p) => p.status === 'active');
     $('#sidebar-projects').innerHTML = active.length
@@ -807,7 +824,7 @@
   }
 
   function route() {
-    const v = (location.hash.match(/^#\/(\w+)/) || [])[1];
+    const v = (location.hash.match(/^#\/?(\w+)/) || [])[1];
     ui.view = ['dashboard', 'projects', 'goals'].includes(v) ? v : 'dashboard';
     document.title = `${{ dashboard: 'Overview', projects: 'Projects', goals: 'Goals' }[ui.view]} · Meridian`;
     $('.app').classList.remove('sidebar-open');
@@ -910,7 +927,14 @@
         commit((s) => { s.settings.theme = dark ? 'light' : 'dark'; });
         break;
       }
-      case 'export': {
+      case 'export': openModal('export'); break;
+      case 'copy-json': {
+        const ta = $('#export-json');
+        navigator.clipboard.writeText(ta.value).then(() => toast('Backup copied to clipboard'))
+          .catch(() => { ta.focus(); ta.select(); toast('Press Ctrl+C or ⌘C to copy'); });
+        break;
+      }
+      case 'download-json': {
         const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
@@ -964,7 +988,7 @@
 
   $('#search').addEventListener('input', (e) => {
     ui.query = e.target.value;
-    if (ui.view === 'dashboard' && ui.query) { location.hash = '#/projects'; return; }
+    if (ui.view === 'dashboard' && ui.query) { location.hash = '#projects'; return; }
     render();
   });
 
@@ -980,9 +1004,9 @@
     if (e.key === '/') { e.preventDefault(); $('#search').focus(); }
     else if (e.key === 'n') { e.preventDefault(); openModal('project'); }
     else if (e.key === 'g') { e.preventDefault(); openModal('goal'); }
-    else if (e.key === '1') location.hash = '#/dashboard';
-    else if (e.key === '2') location.hash = '#/projects';
-    else if (e.key === '3') location.hash = '#/goals';
+    else if (e.key === '1') location.hash = '#dashboard';
+    else if (e.key === '2') location.hash = '#projects';
+    else if (e.key === '3') location.hash = '#goals';
   });
 
   // Drag-and-drop on the project board
